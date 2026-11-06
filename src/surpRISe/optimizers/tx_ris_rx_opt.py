@@ -7,6 +7,57 @@ from surpRISe.components.ris import RIS
 from surpRISe.utils.utils import *
 
 
+def calc_tx_ris_rx_phase_opt(
+    tx_antenna: Antenna,
+    rx_antenna: Antenna,
+    ris: RIS,
+    optimizer: str = "iterative",
+    mode: str = "disc",
+    wave_model: str = "spherical",
+    fc: Optional[float] = None,
+    return_history: bool = False,
+) -> tuple:
+    """Return single-user phases and optional history without modifying the RIS.
+
+    Continuous mode uses analytical phase compensation, independent of the
+    discrete optimizer selection. The return value is always ``(phases, history)``;
+    history is None when unavailable or not requested.
+    """
+    if tx_antenna is None or rx_antenna is None or ris is None:
+        raise ValueError("tx_antenna, rx_antenna, and ris must be provided.")
+    if mode not in ("disc", "cont"):
+        raise ValueError("mode must be either 'disc' or 'cont'")
+    if wave_model not in ("spherical", "plane"):
+        raise ValueError("wave_model must be either 'spherical' or 'plane'")
+
+    if mode == "cont":
+        _, phases = calc_tx_ris_rx_cont_opt(tx_antenna, rx_antenna, ris, wave_model, fc)
+        return phases, None
+
+    optimizers = {
+        "direct_disc": tx_ris_rx_direct_disc_opt,
+        "grid_search": tx_ris_rx_max_bf_grid_search_opt,
+        "chen_alg1": tx_ris_rx_chen_alg1_opt,
+        "1d_search": tx_ris_rx_max_bf_1D_search_opt,
+        "iterative": tx_ris_rx_max_bf_iterative_opt,
+    }
+    if optimizer not in optimizers:
+        raise ValueError(f"Invalid optimizer: {optimizer}")
+    solver = optimizers[optimizer](
+        tx_antenna=tx_antenna,
+        rx_antenna=rx_antenna,
+        ris=ris,
+        wave_model=wave_model,
+        fc=fc,
+    )
+    if optimizer in ("1d_search", "iterative", "grid_search"):
+        result = solver.optimize(return_history=return_history)
+        if return_history:
+            return result
+        return result, None
+    return solver.optimize(), None
+
+
 def calc_spherical_path_exp_shift(
     tx_pos: np.ndarray, rx_pos: np.ndarray, ris_positions: np.ndarray, fc: float
 ) -> np.ndarray:

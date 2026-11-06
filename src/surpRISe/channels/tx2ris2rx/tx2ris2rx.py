@@ -9,7 +9,8 @@ from scipy.constants import c, pi
 
 from surpRISe.components.antenna import Antenna
 from surpRISe.components.ris import RIS
-from surpRISe.optimizers.tx_ris_rx_opt import *
+from surpRISe.optimizers.tx_ris_rx_multiuser_opt import tx_ris_rx_superposition_opt
+from surpRISe.optimizers.tx_ris_rx_opt import calc_tx_ris_rx_phase_opt
 from surpRISe.utils.utils import *
 
 pio.renderers.default = (
@@ -43,6 +44,9 @@ class tx2ris2rx(ABC):
         ris: RIS = None,
         verbose: bool = False,
         fc: Optional[float] = None,
+        rx_positions: Optional[np.ndarray] = None,
+        multiuser_method: str = "superposition",
+        user_weights: Optional[np.ndarray] = None,
     ) -> None:
         """
         Optimize the RIS phase configuration given the selected optimizer and system elements.
@@ -69,6 +73,16 @@ class tx2ris2rx(ABC):
             If True, prints additional information from optimization.
         fc : float, optional
             Carrier frequency in Hz to use for optimization. If None, uses ris.fc.
+        rx_positions : ndarray of shape (K, 3), optional
+            Receiver positions in meters. Uses rx_antenna as a hardware template.
+            K=1 preserves the selected single-user algorithm. K>1 combines
+            continuous user phases, quantizing only the final result in disc mode.
+        multiuser_method : str, optional
+            Currently only 'superposition' is supported. For K>1 the discrete
+            optimizer selection is ignored in favor of continuous compensation.
+        user_weights : ndarray of shape (K,), optional
+            Nonnegative field weights, defaulting to equal weights. Requires
+            rx_positions, finite values, and at least one positive weight.
         """
 
         # Coheck input types
@@ -85,62 +99,47 @@ class tx2ris2rx(ABC):
             raise ValueError("wave_model must be either 'spherical' or 'plane'")
 
         time_init = time.time()
+        opt_history = None
+        is_multiuser = False
+        if multiuser_method != "superposition":
+            raise ValueError("multiuser_method must be 'superposition'")
+        if rx_positions is None and user_weights is not None:
+            raise ValueError("user_weights requires rx_positions")
 
-        if mode == "cont":
-            self.last_optimizer = "perfect"
-            desired_complex, desired_phase = calc_tx_ris_rx_cont_opt(
+        if rx_positions is not None:
+            opt = tx_ris_rx_superposition_opt(
+                tx_antenna=tx_antenna,
+                rx_antenna=rx_antenna,
+                rx_positions=rx_positions,
+                ris=ris,
+                optimizer=optimizer,
+                mode=mode,
+                wave_model=wave_model,
+                fc=fc,
+                user_weights=user_weights,
+            )
+            is_multiuser = len(opt.rx_positions) > 1
+            result = opt.optimize(return_history=verbose)
+            if verbose:
+                opt_phase_shift, opt_history = result
+            else:
+                opt_phase_shift = result
+        else:
+            opt_phase_shift, opt_history = calc_tx_ris_rx_phase_opt(
                 tx_antenna=tx_antenna,
                 rx_antenna=rx_antenna,
                 ris=ris,
+                optimizer=optimizer,
+                mode=mode,
                 wave_model=wave_model,
                 fc=fc,
+                return_history=verbose,
             )
 
-            opt_phase_shift = desired_phase
-
-        else:  # mode == 'disc'
-            self.last_optimizer = optimizer
-            opt_history = None
-
-            # Map of optimizer names to classes
-            optimizers_map = {
-                "direct_disc": tx_ris_rx_direct_disc_opt,
-                "grid_search": tx_ris_rx_max_bf_grid_search_opt,
-                "chen_alg1": tx_ris_rx_chen_alg1_opt,
-                "1d_search": tx_ris_rx_max_bf_1D_search_opt,
-                "iterative": tx_ris_rx_max_bf_iterative_opt,
-            }
-
-            if optimizer not in optimizers_map:
-                raise ValueError(f"Invalid optimizer: {optimizer}")
-
-            # Instantiate the correct optimizer
-            OptClass = optimizers_map[optimizer]
-            opt = OptClass(
-                tx_antenna=tx_antenna,
-                rx_antenna=rx_antenna,
-                ris=ris,
-                wave_model=wave_model,
-                fc=fc,
-            )
-
-            # Optimization call and unpacking
-            if optimizer in self.new_optimizers:
-                # New optimizers accept 'return_history'
-                opt_result = opt.optimize(return_history=verbose)
-            else:
-                # Old optimizers are called without arguments
-                opt_result = opt.optimize()
-
-            # Conditional unpacking
-            if (
-                verbose
-                and optimizer in self.new_optimizers
-                and isinstance(opt_result, tuple)
-            ):
-                opt_phase_shift, opt_history = opt_result
-            else:
-                opt_phase_shift = opt_result
+        if is_multiuser:
+            self.last_optimizer = "superposition"
+        else:
+            self.last_optimizer = "perfect" if mode == "cont" else optimizer
 
         # Update the ris states
         ris.set_all_shift(opt_phase_shift, mode=mode)
@@ -148,7 +147,12 @@ class tx2ris2rx(ABC):
         time_end = time.time()
 
         if verbose:
-            if mode == "cont":
+            if is_multiuser:
+                print(
+                    f"Optimizer 'superposition', mode '{mode}': "
+                    f"Optimizing time {time_end - time_init:.4f} sec."
+                )
+            elif mode == "cont":
                 print(
                     f"Optimizer 'Continuous': Optimizing time {time_end - time_init:.4f} sec."
                 )
@@ -158,7 +162,7 @@ class tx2ris2rx(ABC):
                 )
 
             # Call the plotter if we have history
-            if opt_history is not None:
+            if opt_history is not None and not is_multiuser:
                 self._plot_optimizer_history(opt_history, optimizer)
 
     def _plot_optimizer_history(self, history: dict, optimizer_name: str) -> None:

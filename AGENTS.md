@@ -36,6 +36,9 @@ Do not add propagation paths or claim support for effects absent from the code.
 - `src/surpRISe/optimizers/tx_ris_rx_opt.py`: spherical/plane propagation phase,
   continuous compensation, direct phase quantization, Chen algorithm 1, grid
   search, iterative search, and one-dimensional search.
+- `src/surpRISe/optimizers/tx_ris_rx_multiuser_opt.py`: weighted complex-phase
+  superposition. K>1 always solves continuous user beams and quantizes only the
+  final configuration in discrete mode; K=1 retains the single-user algorithm.
 - `src/surpRISe/utils/utils.py`: coordinate conversion, distances, numerical
   rounding, and a far-field boundary estimate.
 - `notebooks/`: research experiments and usage examples.
@@ -91,10 +94,16 @@ packaging changes require it; generated distributions must remain untracked.
 
 ## Validation and existing limitations
 
-There is currently no dedicated automated test suite, test runner dependency,
-or CI configuration in the repository. Notebook names beginning with `test_`
-do not constitute an automated suite. Do not claim comprehensive validation
-from imports or lint alone.
+`tests/test_multiuser.py` contains small deterministic regression checks using
+standard-library `unittest`. Run:
+
+```powershell
+uv run --locked python -m unittest discover -s tests
+```
+
+There is no additional test runner dependency or CI configuration.
+Notebook names beginning with `test_` do not constitute an automated suite.
+Do not claim comprehensive validation from imports or lint alone.
 
 For numerical changes, run a small deterministic example covering the changed
 behavior. Check shapes, finite values, and relevant physical invariants with
