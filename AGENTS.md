@@ -42,10 +42,15 @@ Do not add propagation paths or claim support for effects absent from the code.
 - `src/surpRISe/utils/utils.py`: coordinate conversion, distances, numerical
   rounding, and a far-field boundary estimate.
 - `notebooks/`: research experiments and usage examples.
-- `src/surpRISe/old_notebooks/`: historical experiments; do not treat them as
+- `notebooks/archive/`: historical experiments; do not treat them as
   authoritative API documentation or regenerate them as routine validation.
-- `README.md`: brief installation guidance. `cheatlist.md`: historical Git and
-  `uv` command reference, not authorization to push, switch branches, or delete.
+- `examples/`: small runnable single-user and multiuser simulations; plotting
+  requires the optional `--plot` flag.
+- `README.md`: public setup and usage guide. `docs/models.md`: conventions,
+  limitations, and literature. `CONTRIBUTING.md` and `docs/development.md`:
+  development workflows. `LICENSE`: MIT, Sergio Mico-Rosa (`sergiomico`).
+- `.github/workflows/ci.yml`: tests, examples, scoped style checks, and builds
+  on Python 3.12 for Linux and Windows. Full-source lint debt is nonblocking.
 
 ## Environment and commands
 
@@ -58,6 +63,8 @@ uv run --locked ruff check src
 uv run --locked ruff format --check src
 uv run --locked python -c "from surpRISe.components.ris import RIS; from surpRISe.channels.tx2ris2rx.tang_general_channel import tang_general_channel"
 uv run --locked jupyter lab
+uv run --locked python examples/single_user.py
+uv run --locked python examples/multiuser_superposition.py
 uv build
 ```
 
@@ -101,7 +108,8 @@ standard-library `unittest`. Run:
 uv run --locked python -m unittest discover -s tests
 ```
 
-There is no additional test runner dependency or CI configuration.
+There is no additional test runner dependency. CI runs these tests, the
+headless examples, scoped Ruff checks, and package builds.
 Notebook names beginning with `test_` do not constitute an automated suite.
 Do not claim comprehensive validation from imports or lint alone.
 
@@ -114,9 +122,9 @@ substantive numerical fixes when appropriate, stating how to run them.
 
 The following are existing caveats, not instructions to fix unrelated code:
 
-- Ruff targets `py38` despite the package requiring Python `>=3.12`. Use the
-  package requirement for runtime compatibility; reconcile tooling only as an
-  intentional configuration change.
+- Ruff targets `py312`, matching the package's minimum Python version. CI
+  enforces lint and formatting for `examples`, `tests`, and the multiuser
+  optimizer. Inspect full-source findings without blanket cleanup.
 - Existing code contains lint/style issues, wildcard imports, and a duplicated
   `plot_phase_bf_angle_2d_polar` definition. Avoid blanket formatting or cleanup.
 - Far-field `path_gain_multrx` is a separate implementation from

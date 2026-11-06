@@ -8,13 +8,13 @@ version = "0.1.0"
 description = "surpRISe: Simulator Under Reconfigurable Propagation in RIS Environments"
 readme = "README.md"
 authors = [
-    { name = "Sergio Micó Rosa", email = "sermiro@iteam.upv.es" }
+    { name = "Sergio Mico-Rosa", email = "sermiro@iteam.upv.es" }
 ]
 requires-python = ">=3.12"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 dependencies = [
@@ -27,12 +27,24 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/sergiomico/surpRISe"
+Repository = "https://github.com/sergiomico/surpRISe"
+Issues = "https://github.com/sergiomico/surpRISe/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/surpRISe"]
 
 [tool.hatch.build.targets.sdist]
-include = ["/src"]
+include = [
+    "/src",
+    "/tests",
+    "/examples",
+    "/docs",
+    "/README.md",
+    "/CONTRIBUTING.md",
+    "/LICENSE",
+    "/pyproject.toml",
+    "/uv.lock",
+]
 
 [dependency-groups]
 dev = [
@@ -41,8 +53,8 @@ dev = [
 ]
 
 [tool.ruff]
-# The code is compatible with Python 3.8+
-target-version = "py38"
+# Match the minimum supported Python version.
+target-version = "py312"
 line-length = 88
 
 [tool.ruff.lint]

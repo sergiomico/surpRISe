@@ -22,8 +22,14 @@ build/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+.ipynb_checkpoints/
 .coverage
 htmlcov/
+
+# Local environment configuration
+.env
+.env.*
+!.env.example
 
 # Editor directories and files
 .vscode/
